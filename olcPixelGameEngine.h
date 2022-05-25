@@ -4081,7 +4081,7 @@ namespace olc
 // O------------------------------------------------------------------------------O
 #if defined(OLC_IMAGE_LIBPNG)
 // #include <png.h>
-#include "libpng16/png.h"
+#include "../External_libraries/libpng16/png.h" // Need to be fixed... MAH
 namespace olc
 {
     void pngReadStream(png_structp pngPtr, png_bytep data, png_size_t length)

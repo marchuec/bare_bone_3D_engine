@@ -3,9 +3,12 @@
 #include "olcPixelGameEngine.h"
 #include <iostream>
 #include <fstream>
-#include <Eigen/Dense>
 #include <deque>
 #include <chrono>
+
+// Eigen 3.4.0
+// https://eigen.tuxfamily.org/index.php?title=Main_Page
+#include "../External_libraries/Eigen/Dense"
 
 using namespace Eigen;
 using namespace olc;
@@ -19,6 +22,8 @@ Notes:
 - All Vector4f reprensent a point in 4D-space (x, y, z, w)
 - All Vector3f reprensent a point in 3D-space (x, y, z) or a vector in 3D-space
 - For simplicity, all matrix operations are done in 4D-space and all geometric operations are done in 3D-space.
+
+- To fix: need to change the line  < #include "../External_libraries/libpng16/png.h" > (line 4084) in oldPixelGameEngine.h to your own libpng16 installation !!
 */
 
 
@@ -452,22 +457,49 @@ public:
     // Called at initialization
     bool OnUserCreate() override
     {
-       
-        // Cube: 12 polygons
-        // SpaceShip: 106 polygons
-        // Mountain: 5000 polygons
-        // Hurricos: 11 800 polygons
-        // Artisans Hub: 9800 polygons
+        // All the models available
+        enum class Model { artisans_hub, hurricos, cube, videoShip, mountain, axis };
+
+        /*
+        Cube: 36 vertices / 12 polygons
+        SpaceShip: 55 vertices / 106 polygons
+        Mountain: 2441 vertices / 5000 polygons
+        Hurricos: 5150 vertices / 11 800 polygons
+        Artisans Hub: 6230 vertices / 9800 polygons 
+        */
 
         // model_.createSimpleCubeModel(); 
         std::string fileName;
-        
-        //fileName = "/Users/marc-antoinehuet/Desktop/Marc-Antoine/Programming projects/3D_engine/models/PlayStation - Spyro 2 Riptos Rage - Hurricos/Hurricos.obj";
-        //fileName = "/Users/marc-antoinehuet/Desktop/Marc-Antoine/Programming projects/3D_engine/models/VideoShip.obj";
-        //fileName = "/Users/marc-antoinehuet/Desktop/Marc-Antoine/Programming projects/3D_engine/models/Mountain.obj";
-        fileName = "/Users/marc-antoinehuet/Desktop/Marc-Antoine/Programming projects/3D_engine/models/PlayStation - Spyro the Dragon - Artisans Hub/Artisans Hub.obj";
 
-        if(!model_.loadFromObjectFile(fileName, true))
+        
+        Model modelToLoad = Model::artisans_hub;
+
+        bool status = false;
+        switch (modelToLoad)
+        {
+            case Model::artisans_hub :
+                status = model_.loadFromObjectFile("../models/PlayStation - Spyro the Dragon - Artisans Hub/Artisans Hub.obj", true);
+                break;
+            case Model::hurricos :
+                status = model_.loadFromObjectFile("../models/PlayStation - Spyro 2 Riptos Rage - Hurricos/Hurricos.obj", true);
+                break;
+            case Model::cube : 
+                model_.createSimpleCubeModel(); status = true;
+                break;
+            case Model::mountain :
+                status = model_.loadFromObjectFile("../models/Mountain.obj", false);
+                break;
+            case Model::axis :
+                status = model_.loadFromObjectFile("../models/Axis.obj", false);
+                break;
+            case Model::videoShip :
+                status = model_.loadFromObjectFile("../models/VideoShip.obj", false);
+                break;
+            default:
+                return false;
+        }
+
+        if(!status)
             return false;
 
         matProjection_ = createProjectionMatrix(90.0f, ScreenWidth(), ScreenHeight(), 0.5f, 2000.0f);
