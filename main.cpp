@@ -309,7 +309,7 @@ std::vector<Triangle> Engine3D::applyMatrixOps(void)
     std::vector<Triangle> processedTriangles;
 
     // Draw each triangle one at a time
-    for (auto triangle : model_.triangles)
+    for (auto triangle : model_.triangles)      // Matrix operation only!
     {
         // Transformation from model-space to world-space
         for (uint32_t i = 0u; i < 3; i++)
