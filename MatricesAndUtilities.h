@@ -164,11 +164,14 @@ Vector3f lineIntersectPlane(const Vector3f& planePoint, const Vector3f& planeNor
  * @param planePoint    A point of the plane
  * @param planeNormal   The normal of the plane
  * @param triangle      The triangle to clip
- * @return All the resulting triangles (between 0 and 2)
+ * @param triangleOut0  The first output triangle
+ * @param triangleOut1  The second output triangle
+ * 
+ * @return The number of clipped triangles (0 to 2)
  */
-std::vector<Triangle> clipTriangleAgainsPlane(Vector3f planePoint, Vector3f planeNormal, Triangle& triangle)
+size_t clipTriangleAgainstPlane(Vector3f planePoint, Vector3f planeNormal, Triangle& triangle, Triangle& triangleOut0, Triangle& triangleOut1)
 {
-    std::vector<Triangle> clippedTriangles;
+    uint32_t nbClippedTriangles = 0u;
     planeNormal.normalized();   // Just to be sure
 
     // Shortest distance from point to plane including direction (+ -> inside, - -> outside)
@@ -213,39 +216,37 @@ std::vector<Triangle> clipTriangleAgainsPlane(Vector3f planePoint, Vector3f plan
     // Case #2 : All points are inside the zone. The triangle is kept.
     else if (nbInsidePoints == 3)
     {
-        clippedTriangles.push_back(triangle);
+        triangleOut0 = triangle;
+        nbClippedTriangles = 1u;
     }
     // Case #3 : The triangle is clipped and result in 1 new triangle
     else if (nbInsidePoints == 1 && nbOutsidePoints == 2)
     {
         float t = 0.0f;
-        Triangle newTriangle;
 
         //! Really important to keep the same points ordering as the initial triangle! //
 
-        newTriangle.p[0] = convert(*insidePoints[0]);
-        newTriangle.p[1] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[0], *outsidePoints[0], t));
-        newTriangle.p[2] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[0], *outsidePoints[1], t));
-        clippedTriangles.push_back(newTriangle);
+        triangleOut0.p[0] = convert(*insidePoints[0]);
+        triangleOut0.p[1] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[0], *outsidePoints[0], t));
+        triangleOut0.p[2] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[0], *outsidePoints[1], t));
+        nbClippedTriangles = 1u;
     }
     // Case #4 : The triangle is clipped in 2 new triangles
     else if (nbInsidePoints == 2 && nbOutsidePoints == 1)
     {
         float t = 0.0f;
-        Triangle newTriangle1, newTriangle2;
 
         //! Really important to keep the same points ordering as the initial triangle! //
 
-        newTriangle1.p[0] = convert(*insidePoints[0]);
-        newTriangle1.p[1] = convert(*insidePoints[1]);
-        newTriangle1.p[2] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[0], *outsidePoints[0], t));
+        triangleOut0.p[0] = convert(*insidePoints[0]);
+        triangleOut0.p[1] = convert(*insidePoints[1]);
+        triangleOut0.p[2] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[0], *outsidePoints[0], t));
 
-        newTriangle2.p[0] = convert(*insidePoints[1]);
-        newTriangle2.p[1] = newTriangle1.p[2];      // Are p[1] and p[2] inverted ??
-        newTriangle2.p[2] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[1], *outsidePoints[0], t));
-        clippedTriangles.push_back(newTriangle1);
-        clippedTriangles.push_back(newTriangle2);
+        triangleOut1.p[0] = convert(*insidePoints[1]);
+        triangleOut1.p[1] = triangleOut0.p[2];      // Are p[1] and p[2] inverted ??
+        triangleOut1.p[2] = convert(lineIntersectPlane(planePoint, planeNormal, *insidePoints[1], *outsidePoints[0], t));
+        nbClippedTriangles = 2u;
     }
 
-    return clippedTriangles;
+    return nbClippedTriangles;
 }

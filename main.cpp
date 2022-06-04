@@ -268,10 +268,10 @@ public:
     {
         elapsedTime_ = elapsedTime;
 
-        // Apply the matrix operations to all the triangles of the model
+        // Apply all the matrix operations necessary to project the triangles on the 2D screen.
         std::vector<Triangle> result = applyMatrixOps();
 
-        // Clip all the triangles agains the 
+        // TBD
         clipAndDraw(result);
 
         return true;
@@ -288,37 +288,36 @@ private:
     Vector3f vLookDir_;     // Direction where we are looking at from the point of view of the camera
     float elapsedTime_;     // Elapsed time since last frame
 
-    void updateCamera(void);
-    void clipAndDraw(std::vector<Triangle>& triangles);
+    bool updateCamera(void);
+    void clipAndDraw(std::vector<Triangle>);
     std::vector<Triangle> applyMatrixOps(void);
 };
 
 
+// Apply all the matrix operations necessary to project the triangles on the 2D screen.
 std::vector<Triangle> Engine3D::applyMatrixOps(void)
 {
-    auto start1 = std::chrono::steady_clock::now();
     updateCamera();
 
     // Transformation from model-space to world-space
     Matrix4f modelToWorldTransform = createTranslationMatrix({ 0.0f, 0.0f, 300.0f})
-                                        * createRotationXMatrix(-M_PI/2)
+                                        * createRotationXMatrix(0)
                                         * createRotationZMatrix(0) 
                                         * createRotationYMatrix(0)
                                         * createScaleMatrix(1.0f, 1.0f, 1.0f);
 
     std::vector<Triangle> processedTriangles;
 
-    // Draw each triangle one at a time
-    for (auto triangle : model_.triangles)      // Matrix operation only!
+    for (auto triangle : model_.triangles)
     {
         // Transformation from model-space to world-space
-        for (uint32_t i = 0u; i < 3; i++)
+        for (uint32_t i = 0u; i < 3; i++)       // 2 us
         {
             triangle.p[i] = modelToWorldTransform * triangle.p[i];
         }
 
         // Only keep the triangle that are visible from the camera
-        Vector3f vVertex1 = (triangle.p[1] - triangle.p[0])(seq(0,2));
+        Vector3f vVertex1 = (triangle.p[1] - triangle.p[0])(seq(0,2));      // 3 us
         Vector3f vVertex2 = (triangle.p[2] - triangle.p[1])(seq(0,2));
 
         Vector3f vTriangleNormal = (vVertex1.cross(vVertex2)).normalized();
@@ -334,18 +333,20 @@ std::vector<Triangle> Engine3D::applyMatrixOps(void)
                 triangle.p[i] = worldToCameraTransform_ * triangle.p[i];
             }
 
-            std::vector<Triangle> clippedTriangles;
-            clippedTriangles = clipTriangleAgainsPlane( {0.0f, 0.0f, 0.5f}, Vector3f::UnitZ(), triangle);
-            for (auto& clippedTriangle : clippedTriangles)
+            Triangle clippedTriangles[2];
+            uint32_t nbClippedTriangles = clipTriangleAgainstPlane( {0.0f, 0.0f, 0.5f}, Vector3f::UnitZ(), triangle, clippedTriangles[0], clippedTriangles[1]);      // 6 us
+            for (uint32_t i = 0u; i < nbClippedTriangles; i++)  // 5 us
             {
+                auto start4 = std::chrono::steady_clock::now();
+                Triangle& clippedTriangle = clippedTriangles[i];
+
                 for (uint32_t i = 0u; i < 3; i++)
                 {
                     // Transformation from camera-space to screen-space (2D).
                     clippedTriangle.p[i] = (matProjection_ * clippedTriangle.p[i]);
                         
-                    
                     // At this point, the coordinates are (x, y, z', 1) and the triangle is projected on 2D screen. X and Y are 
-                    // between -1 and +1. But, the coordinates for the API are as follow:
+                    // between -1 and +1 if the line was in the FOV region. But, the coordinates for the API are as follow:
                     //
                     // In world space:          API (drawing windoe):
                     //  Y                       |---- X
@@ -361,23 +362,16 @@ std::vector<Triangle> Engine3D::applyMatrixOps(void)
                     clippedTriangle.p[i] /= clippedTriangle.p[i].w();
                 }
 
-                processedTriangles.push_back(clippedTriangle);
+                processedTriangles.push_back(clippedTriangle);   
             }
         }
     }
 
-    auto end1 = std::chrono::steady_clock::now();
-    std::cout << "Elapsed time for matrix operations: "
-        << std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count()
-        << " ms" << std::endl;
-
     return processedTriangles;
 }
 
-void Engine3D::clipAndDraw(std::vector<Triangle>& triangles)
+void Engine3D::clipAndDraw(std::vector<Triangle> triangles)
 {
-    auto start2 = std::chrono::steady_clock::now();
-
     // Clear the screen
     Clear(Pixel(0,0,0));
 
@@ -408,22 +402,22 @@ void Engine3D::clipAndDraw(std::vector<Triangle>& triangles)
                 trianglesToClip.pop_front();
                 nbNewTriangles--;
 
-                std::vector<Triangle> clippedTriangles;
-
+                Triangle clippedTriangles[2];
+                uint32_t nbClippedTriangles = 0u;
                 switch (planeId)
                 {
                     case 0:	// Ymin
-                        clippedTriangles = clipTriangleAgainsPlane({ 0.0f, 0.0f, 0.0f }, Vector3f::UnitY(), test); break;
+                        nbClippedTriangles = clipTriangleAgainstPlane({ 0.0f, 0.0f, 0.0f }, Vector3f::UnitY(), test, clippedTriangles[0], clippedTriangles[1]); break;
                     case 1: // Ymax
-                        clippedTriangles = clipTriangleAgainsPlane({ 0.0f, (float)ScreenHeight() - 1, 0.0f }, -1 * Vector3f::UnitY(), test); break;
+                        nbClippedTriangles = clipTriangleAgainstPlane({ 0.0f, (float)ScreenHeight() - 1, 0.0f }, -1 * Vector3f::UnitY(), test, clippedTriangles[0], clippedTriangles[1]); break;
                     case 2:	// Xmin
-                        clippedTriangles = clipTriangleAgainsPlane({ 0.0f, 0.0f, 0.0f }, Vector3f::UnitX(), test); break;
+                        nbClippedTriangles = clipTriangleAgainstPlane({ 0.0f, 0.0f, 0.0f }, Vector3f::UnitX(), test, clippedTriangles[0], clippedTriangles[1]); break;
                     case 3:	// Xmax
-                        clippedTriangles = clipTriangleAgainsPlane({ (float)ScreenWidth() - 1, 0.0f, 0.0f }, -1 * Vector3f::UnitX(), test); break;
+                        nbClippedTriangles = clipTriangleAgainstPlane({ (float)ScreenWidth() - 1, 0.0f, 0.0f }, -1 * Vector3f::UnitX(), test, clippedTriangles[0], clippedTriangles[1]); break;
                 }
 
-                for (auto& clippedTriangle : clippedTriangles)
-                    trianglesToClip.push_back(clippedTriangle);
+                for (uint32_t i = 0u; i < nbClippedTriangles; i++)
+                    trianglesToClip.push_back(clippedTriangles[i]);
             }
             // All the triangles of the queue have been clipped agains the plane. Update the number of triangles to process for the new plane
             nbNewTriangles = trianglesToClip.size();
@@ -445,16 +439,14 @@ void Engine3D::clipAndDraw(std::vector<Triangle>& triangles)
             DrawString(200, 0, textOverlay.str());
         }
     }
-
-    auto end2 = std::chrono::steady_clock::now();
-    std::cout << "Elapsed time for geometric operations: "
-                << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2).count()
-                << " ms" << std::endl;
 }
 
-
-void Engine3D::updateCamera(void)
+// Create the worldToCameraTransform
+// Return true if the camera changed, false otherwise
+bool Engine3D::updateCamera(void)
 {
+    Matrix4f worldToCameraTransformPrev = worldToCameraTransform_;
+
     if (GetKey(Key::UP).bHeld)
         vCameraPos_.y() += 100.0f * elapsedTime_;	    // Move the camera up
 
@@ -483,6 +475,8 @@ void Engine3D::updateCamera(void)
     Vector3f vTarget = vCameraPos_ + vLookDir_;
 
     worldToCameraTransform_ = createLookAtMatrix(vCameraPos_, vTarget, vUp);
+
+    return (worldToCameraTransform_ == worldToCameraTransformPrev) ? false : true;
 }
 
 // Used to mesure API performance
@@ -536,7 +530,7 @@ private:
 int main(int argc, char const* argv[])
 {
     Engine3D engine3D;
-    if (engine3D.Construct(800, 800, 1, 1))
+    if (engine3D.Construct(600, 600, 2, 2))
         engine3D.Start();
 
     // RefGameEngine refGameEngine;
