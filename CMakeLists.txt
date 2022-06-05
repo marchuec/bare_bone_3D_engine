@@ -2,8 +2,8 @@ PROJECT(output)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.2)
 ADD_EXECUTABLE(output main.cpp)
 
-set (CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+set (CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++2a")
 
 include_directories(./)
 

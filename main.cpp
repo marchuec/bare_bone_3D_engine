@@ -5,6 +5,7 @@
 #include <fstream>
 #include <deque>
 #include <chrono>
+#include <algorithm>
 
 // Matrix library and custom matrices
 #include "MatricesAndUtilities.h"
@@ -294,7 +295,7 @@ private:
 };
 
 
-// Apply all the matrix operations necessary to project the triangles on the 2D screen.
+// Apply all the matrix operations necessary to project the triangles on the 2D screen. // 5 us/calcul total sans draw
 std::vector<Triangle> Engine3D::applyMatrixOps(void)
 {
     updateCamera();
@@ -317,7 +318,7 @@ std::vector<Triangle> Engine3D::applyMatrixOps(void)
         }
 
         // Only keep the triangle that are visible from the camera
-        Vector3f vVertex1 = (triangle.p[1] - triangle.p[0])(seq(0,2));      // 3 us
+        Vector3f vVertex1 = (triangle.p[1] - triangle.p[0])(seq(0,2));
         Vector3f vVertex2 = (triangle.p[2] - triangle.p[1])(seq(0,2));
 
         Vector3f vTriangleNormal = (vVertex1.cross(vVertex2)).normalized();
@@ -337,7 +338,6 @@ std::vector<Triangle> Engine3D::applyMatrixOps(void)
             uint32_t nbClippedTriangles = clipTriangleAgainstPlane( {0.0f, 0.0f, 0.5f}, Vector3f::UnitZ(), triangle, clippedTriangles[0], clippedTriangles[1]);      // 6 us
             for (uint32_t i = 0u; i < nbClippedTriangles; i++)  // 5 us
             {
-                auto start4 = std::chrono::steady_clock::now();
                 Triangle& clippedTriangle = clippedTriangles[i];
 
                 for (uint32_t i = 0u; i < 3; i++)
@@ -384,6 +384,8 @@ void Engine3D::clipAndDraw(std::vector<Triangle> triangles)
     });
 
     // Clip the triangles agains the four planes (X+, X-. Y+, Y-)
+    // std::for_each(std::execution::par, triangles.begin(), triangles.end(), []()
+    // {
     for (auto& triangle : triangles)    // This should be parallelized
     {
         // List of triangles to clip
@@ -439,6 +441,7 @@ void Engine3D::clipAndDraw(std::vector<Triangle> triangles)
             DrawString(200, 0, textOverlay.str());
         }
     }
+    // })
 }
 
 // Create the worldToCameraTransform
@@ -532,6 +535,7 @@ int main(int argc, char const* argv[])
     Engine3D engine3D;
     if (engine3D.Construct(600, 600, 2, 2))
         engine3D.Start();
+
 
     // RefGameEngine refGameEngine;
     // if (refGameEngine.Construct(800, 800, 1, 1))
